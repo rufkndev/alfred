@@ -1,0 +1,8 @@
+fastapi==0.159.1
+uvicorn[standard]==0.54.0
+sqlalchemy==2.1.6
+psycopg[binary]==3.3.6
+openai==3.36.1
+socksio==1.0.0
+webauthn==3.0.1
+pywebpush==2.5.0
