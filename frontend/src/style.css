@@ -415,6 +415,9 @@ a {
 .md td {
   border: 1px solid var(--line);
   padding: 4px 8px;
+  min-width: 4.5em;
+  overflow-wrap: normal;
+  vertical-align: top;
 }
 
 .md pre {

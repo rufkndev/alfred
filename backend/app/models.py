@@ -1,5 +1,7 @@
 import datetime as dt
+import os
 from decimal import Decimal
+from pathlib import Path
 
 from sqlalchemy import JSON, Date, DateTime, ForeignKey, LargeBinary, Numeric, String, Text, func, select
 from sqlalchemy.orm import Mapped, mapped_column
@@ -113,8 +115,17 @@ class Credential(Base):
     sign_count: Mapped[int] = mapped_column(default=0)
 
 
+SEED_DIR = Path(os.environ.get("SEED_DIR", "/srv/seed"))
+
+
 def seed(db):
     if db.scalar(select(func.count(Business.id))) == 0:
         for i, name in enumerate(["BBifather", "MentorLM", "Pixora", "YC"]):
             db.add(Business(name=name, position=i))
-        db.commit()
+    # seed/memory.gym.md → документ memory:gym; заполняется только пока документ пуст
+    for f in sorted(SEED_DIR.glob("*.md")) if SEED_DIR.is_dir() else []:
+        key = f.stem.replace(".", ":")
+        doc = db.get(Doc, key)
+        if not doc or not doc.text.strip():
+            db.merge(Doc(key=key, text=f.read_text(encoding="utf-8")))
+    db.commit()
