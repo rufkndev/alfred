@@ -259,10 +259,9 @@ TOOLS = {
     "delete_reminder": (t_delete_reminder, "Отменить напоминание", {"id": I}, ["id"], lambda a: "отменил напоминание"),
 }
 
-TOOL_SCHEMAS = [{"type": "function", "function": {
-    "name": name, "description": desc,
-    "parameters": {"type": "object", "properties": props, "required": req}}}
-    for name, (_, desc, props, req, _) in TOOLS.items()]
+TOOL_SCHEMAS = [{"type": "function", "name": name, "description": desc, "strict": False,
+                 "parameters": {"type": "object", "properties": props, "required": req}}
+                for name, (_, desc, props, req, _) in TOOLS.items()]
 
 
 def run_tool(db, name, args_json):
@@ -284,20 +283,22 @@ def dialog(db, chat):
     return db.scalars(select(Message).where(Message.chat == chat, Message.id > last_reset).order_by(Message.id)).all()
 
 
-def to_openai(m):
+def to_input(m):
+    """Сообщение из БД → элементы input для Responses API."""
     if m.role == "tool":
-        return {"role": "tool", "tool_call_id": m.meta["tool_call_id"], "content": m.content}
-    msg = {"role": m.role, "content": m.content}
-    if m.meta and m.meta.get("tool_calls"):
-        msg["tool_calls"] = m.meta["tool_calls"]
-    return msg
+        return [{"type": "function_call_output", "call_id": m.meta["tool_call_id"], "output": m.content}]
+    items = [{"role": m.role, "content": m.content}] if m.content else []
+    for c in (m.meta or {}).get("tool_calls", []):
+        items.append({"type": "function_call", "call_id": c["id"], "name": c["function"]["name"],
+                      "arguments": c["function"]["arguments"]})
+    return items
 
 
 def context(db, chat):
     msgs = dialog(db, chat)[-HISTORY:]
     while msgs and msgs[0].role != "user":
         msgs = msgs[1:]
-    return [to_openai(m) for m in msgs]
+    return [item for m in msgs for item in to_input(m)]
 
 
 router = APIRouter(prefix="/api/chat", dependencies=[Depends(require_auth)])
@@ -329,18 +330,17 @@ def send(chat: str, data: dict = Body(...), db=Depends(get_db)):
     db.add(user)
     db.commit()
     new = [user]
+    # первый запрос — вся история; дальше результаты инструментов цепляются через previous_response_id,
+    # чтобы модель сохраняла рассуждения между вызовами
+    request = {"input": context(db, chat)}
     for _ in range(10):
         try:
-            r = client.chat.completions.create(
-                model=MODEL, tools=TOOL_SCHEMAS,
-                messages=[{"role": "system", "content": system_prompt(db, chat)}] + context(db, chat),
-            )
+            r = client.responses.create(model=MODEL, tools=TOOL_SCHEMAS, instructions=system_prompt(db, chat), **request)
         except Exception as e:
             raise HTTPException(502, f"OpenAI: {e}")
-        m = r.choices[0].message
-        calls = [{"id": c.id, "type": "function", "function": {"name": c.function.name, "arguments": c.function.arguments}}
-                 for c in m.tool_calls or []]
-        batch = [Message(chat=chat, role="assistant", content=m.content or "", meta={"tool_calls": calls} if calls else None)]
+        calls = [{"id": o.call_id, "type": "function", "function": {"name": o.name, "arguments": o.arguments}}
+                 for o in r.output if o.type == "function_call"]
+        batch = [Message(chat=chat, role="assistant", content=r.output_text or "", meta={"tool_calls": calls} if calls else None)]
         for c in calls:
             result, label = run_tool(db, c["function"]["name"], c["function"]["arguments"])
             batch.append(Message(chat=chat, role="tool", content=result, meta={"tool_call_id": c["id"], "label": label}))
@@ -349,4 +349,5 @@ def send(chat: str, data: dict = Body(...), db=Depends(get_db)):
         new += batch
         if not calls:
             break
+        request = {"previous_response_id": r.id, "input": [i for m in batch[1:] for i in to_input(m)]}
     return [row(m) for m in new]
