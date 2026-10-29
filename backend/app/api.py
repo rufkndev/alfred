@@ -1,11 +1,11 @@
 import datetime as dt
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import delete, func, or_, select, update
 
 from .auth import require_auth
 from .db import get_db, today
-from .models import Account, Balance, Business, Doc, Expense, Item, Message, Note, Section
+from .models import Account, Balance, BlockDone, Business, Doc, Expense, Item, Message, Note, Section
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_auth)])
 
@@ -99,10 +99,60 @@ def delete_item(id: int, db=Depends(get_db)):
     return {"ok": True}
 
 
+def task_source(db, list_):
+    """Название раздела, откуда задача (для сводки в «Общем»)."""
+    if list_ == "admission_tasks":
+        return "Поступление"
+    if list_.startswith("biz:"):
+        biz = db.get(Business, int(list_.split(":")[1]))
+        return biz.name if biz else None
+    if list_.startswith("s") and list_[1:-6].isdigit():
+        section = db.get(Section, int(list_[1:-6]))
+        return section.title if section else None
+    return None
+
+
+@router.get("/tasks")
+def list_tasks(list_: str | None = Query(None, alias="list"), db=Depends(get_db)):
+    """Задачи одного списка; без list — сводка «Общего»: свои задачи + задачи разделов с датой."""
+    rollover(db)
+    if list_:
+        q = select(Item).filter_by(list=list_)
+    else:
+        q = select(Item).where(Item.list.endswith("tasks"), or_(Item.list == "day_tasks", Item.date.is_not(None)),
+                               or_(Item.done.is_(False), Item.date >= today()))
+    sources = {}
+    out = []
+    for i in db.scalars(q.order_by(Item.position, Item.id)):
+        if not list_ and i.list not in sources:
+            sources[i.list] = task_source(db, i.list)
+        out.append({**row(i), "source": sources.get(i.list)})
+    return out
+
+
 @router.post("/items/reorder")
 def reorder_items(data: dict = Body(...), db=Depends(get_db)):
     for pos, id in enumerate(data["ids"]):
         db.execute(update(Item).filter_by(id=id).values(position=pos))
+    db.commit()
+    return {"ok": True}
+
+
+# --- блоки дня: шаблон недели (blocks_wd1..7, 1 = понедельник) + разовые day_blocks ---
+
+@router.get("/blocks")
+def template_blocks(date: str, db=Depends(get_db)):
+    d = dt.date.fromisoformat(date)
+    done = set(db.scalars(select(BlockDone.item_id).filter_by(date=d)))
+    return [{**row(i), "done": i.id in done} for i in db.scalars(items_query(f"blocks_wd{d.isoweekday()}"))]
+
+
+@router.post("/blocks/done")
+def mark_block(data: dict = Body(...), db=Depends(get_db)):
+    d = dt.date.fromisoformat(data["date"])
+    db.execute(delete(BlockDone).filter_by(date=d, item_id=data["item_id"]))
+    if data["done"]:
+        db.add(BlockDone(date=d, item_id=data["item_id"]))
     db.commit()
     return {"ok": True}
 

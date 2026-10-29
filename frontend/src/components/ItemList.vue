@@ -3,8 +3,14 @@ import { ref, watch } from 'vue'
 import draggable from 'vuedraggable'
 import { del, get, patch, post, q } from '../api'
 
-// archive=true — режим установок (архив вместо галочки)
-const props = defineProps({ list: String, date: String, archive: Boolean, placeholder: { type: String, default: 'Добавить' } })
+// archive=true — режим установок (архив вместо галочки); plain=true — без галочек (шаблон блоков)
+const props = defineProps({
+  list: String,
+  date: String,
+  archive: Boolean,
+  plain: Boolean,
+  placeholder: { type: String, default: 'Добавить' },
+})
 const flag = props.archive ? 'archived' : 'done'
 const open = ref([])
 const closed = ref([])
@@ -48,9 +54,9 @@ const reorder = () => post('/items/reorder', { ids: open.value.map((i) => i.id) 
   <div class="list">
     <draggable v-model="open" item-key="id" handle=".handle" :animation="150" @end="reorder">
       <template #item="{ element: item }">
-        <div class="row">
-          <button v-if="!archive" class="check" @click="toggle(item)" />
-          <input class="row-input" :value="item.text" @change="save(item, $event)" @keydown.enter="$event.target.blur()" />
+        <div class="row top">
+          <button v-if="!archive && !plain" class="check" @click="toggle(item)" />
+          <textarea v-autosize class="row-text" rows="1" :value="item.text" @change="save(item, $event)" @keydown.enter.prevent="$event.target.blur()" />
           <button v-if="archive" class="row-action" @click="toggle(item)">в архив</button>
           <span class="handle">⋮⋮</span>
         </div>
@@ -67,9 +73,9 @@ const reorder = () => post('/items/reorder', { ids: open.value.map((i) => i.id) 
         {{ archive ? 'Архив' : 'Выполнено' }} · {{ closed.length }} {{ showClosed ? '▴' : '▾' }}
       </button>
       <template v-if="showClosed">
-        <div v-for="item in closed" :key="item.id" class="row done">
+        <div v-for="item in closed" :key="item.id" class="row top done">
           <button v-if="!archive" class="check on" @click="toggle(item)" />
-          <input class="row-input" :value="item.text" @change="save(item, $event)" @keydown.enter="$event.target.blur()" />
+          <textarea v-autosize class="row-text" rows="1" :value="item.text" @change="save(item, $event)" @keydown.enter.prevent="$event.target.blur()" />
           <button v-if="archive" class="row-action" @click="toggle(item)">вернуть</button>
         </div>
       </template>

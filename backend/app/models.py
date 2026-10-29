@@ -24,6 +24,13 @@ class Item(Base):
     created_at: Mapped[dt.datetime] = Created()
 
 
+class BlockDone(Base):
+    """Отметка «выполнено» у блока из шаблона недели (items blocks_wd1..7) в конкретный день."""
+    __tablename__ = "block_done"
+    date: Mapped[dt.date] = mapped_column(Date, primary_key=True)
+    item_id: Mapped[int] = mapped_column(primary_key=True)
+
+
 class Note(Base):
     __tablename__ = "notes"
     id: Mapped[int] = mapped_column(primary_key=True)

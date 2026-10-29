@@ -13,6 +13,7 @@ import NoteView from './views/NoteView.vue'
 import Settings from './views/Settings.vue'
 import CustomSection from './views/CustomSection.vue'
 import NewSection from './views/NewSection.vue'
+import BlockTemplate from './views/BlockTemplate.vue'
 import { state } from './api'
 
 export const SECTIONS = [
@@ -52,6 +53,7 @@ export default createRouter({
     { path: '/settings', component: Settings },
     { path: '/s/:id', component: CustomSection, props: true },
     { path: '/sections/new', component: NewSection },
+    { path: '/blocks/template', component: BlockTemplate },
   ],
 })
 

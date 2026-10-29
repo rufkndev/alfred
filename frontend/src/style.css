@@ -255,9 +255,68 @@ a {
   padding: 12px 0;
 }
 
-.row.done .row-input {
+.row.done .row-input,
+.row.done .row-text {
   color: var(--muted);
   text-decoration: line-through;
+}
+
+/* многострочные строки: длинный текст переносится, а не обрезается */
+.row.top {
+  align-items: flex-start;
+}
+
+.row.top .check {
+  margin-top: 12px;
+}
+
+.row-text {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 12px 0;
+  line-height: 1.35;
+  resize: none;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.row-text.static {
+  white-space: pre-wrap;
+}
+
+.task-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.task-body .row-text {
+  padding-bottom: 2px;
+}
+
+.task-meta {
+  display: flex;
+  gap: 6px;
+  padding-bottom: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.date-chip {
+  position: relative;
+}
+
+.date-chip.overdue {
+  color: var(--danger);
+}
+
+/* невидимый нативный выбор даты поверх метки: тап открывает системный пикер iOS */
+.date-chip input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
 }
 
 .check {

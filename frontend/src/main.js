@@ -1,6 +1,7 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
+import { autosize } from './api'
 import './style.css'
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js')
@@ -15,4 +16,13 @@ vv?.addEventListener('resize', setViewport)
 vv?.addEventListener('scroll', setViewport)
 setViewport()
 
-createApp(App).use(router).mount('#app')
+// v-autosize: textarea растёт по тексту, длинные задачи переносятся, а не обрезаются
+const autosizeDirective = {
+  mounted(el) {
+    autosize(el)
+    el.addEventListener('input', () => autosize(el))
+  },
+  updated: autosize,
+}
+
+createApp(App).use(router).directive('autosize', autosizeDirective).mount('#app')

@@ -47,9 +47,12 @@ CHATS = {
 }
 
 DATA_MAP = """## Данные приложения
-Списки (items, поле list): day_tasks — задачи на день (с date), day_blocks — блоки/дела дня без времени (с date),
+Списки (items, поле list): day_tasks — задачи раздела «Общее» (date — на какой день, обычно сегодня),
 admission_tasks — задачи поступления, biz:<id>:tasks — задачи бизнеса, basketball_mindsets и cs2_mindsets —
-установки (archived=true — в архиве). У задач done = выполнено.
+установки (archived=true — в архиве). У задач done = выполнено. У любой задачи можно поставить date (срок):
+задачи разделов с датой показываются и в «Общем» в группах Сегодня/Завтра/Позже.
+Блоки дня (дела без времени): blocks_wd1…blocks_wd7 — постоянный шаблон по дням недели (1 = понедельник),
+появляется в этот день недели автоматически; day_blocks (с date) — разовые блоки на конкретный день.
 Заметки (notes, поле list): general — заметки раздела «Общее», admission, biz:<id>, basketball_materials,
 basketball_thoughts, cs2_materials, cs2_thoughts.
 Документы (docs, по ключу): thoughts:YYYY-MM-DD — мысли за день, memory:<раздел> — твоя память раздела

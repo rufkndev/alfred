@@ -5,7 +5,7 @@ import { del, get, patch } from '../api'
 import { useQuery } from '../router'
 import Page from '../components/Page.vue'
 import Tabs from '../components/Tabs.vue'
-import ItemList from '../components/ItemList.vue'
+import TaskList from '../components/TaskList.vue'
 import NoteList from '../components/NoteList.vue'
 
 const props = defineProps({ id: String })
@@ -29,7 +29,7 @@ async function remove() {
 <template>
   <Page :title="biz?.name" back="/business" chat="business" :memory="`memory:biz:${id}`" :memory-title="`Память · ${biz?.name || ''}`">
     <Tabs v-model="tab" :tabs="['Задачи', 'Заметки']" />
-    <ItemList v-if="tab == 0" :list="`biz:${id}:tasks`" placeholder="Добавить задачу" />
+    <TaskList v-if="tab == 0" :list="`biz:${id}:tasks`" />
     <NoteList v-else :list="`biz:${id}`" />
     <template v-if="biz">
       <button class="btn subtle" @click="toggleArchive">{{ biz.archived ? 'Вернуть из архива' : 'В архив' }}</button>

@@ -6,6 +6,7 @@ import { TAB_TITLES, useQuery } from '../router'
 import Page from '../components/Page.vue'
 import Tabs from '../components/Tabs.vue'
 import ItemList from '../components/ItemList.vue'
+import TaskList from '../components/TaskList.vue'
 import NoteList from '../components/NoteList.vue'
 import DocEditor from '../components/DocEditor.vue'
 
@@ -36,7 +37,7 @@ async function remove() {
   <Page :title="section?.title" :chat="key" :memory="`memory:${key}`" :memory-title="`Память · ${section?.title || ''}`">
     <template v-if="section">
       <Tabs v-if="section.tabs.length > 1" v-model="tab" :tabs="section.tabs.map((t) => TAB_TITLES[t])" />
-      <ItemList v-if="current === 'tasks'" :list="`${key}_tasks`" placeholder="Добавить задачу" />
+      <TaskList v-if="current === 'tasks'" :list="`${key}_tasks`" />
       <NoteList v-else-if="current === 'notes'" :list="key" />
       <ItemList v-else-if="current === 'mindsets'" :list="`${key}_mindsets`" archive placeholder="Добавить установку" />
       <DocEditor v-else-if="current === 'plan'" :doc-key="`plan:${key}`" markdown placeholder="План пока пуст — обсуди его в чате." />
