@@ -11,6 +11,9 @@ import ChatView from './views/ChatView.vue'
 import DocView from './views/DocView.vue'
 import NoteView from './views/NoteView.vue'
 import Settings from './views/Settings.vue'
+import CustomSection from './views/CustomSection.vue'
+import NewSection from './views/NewSection.vue'
+import { state } from './api'
 
 export const SECTIONS = [
   { path: '/', title: 'Общее', chat: 'general' },
@@ -23,7 +26,13 @@ export const SECTIONS = [
   { path: '/food', title: 'Питание', chat: 'food' },
 ]
 
-export const chatTitle = (chat) => SECTIONS.find((s) => s.chat === chat)?.title
+export const TAB_TITLES = { tasks: 'Задачи', notes: 'Заметки', mindsets: 'Установки', plan: 'План' }
+
+// Встроенные разделы + свои (ключ чата своего раздела — s<id>)
+export const allSections = () =>
+  SECTIONS.concat(state.sections.map((s) => ({ path: `/s/${s.id}`, title: s.title, chat: `s${s.id}` })))
+
+export const chatTitle = (chat) => allSections().find((s) => s.chat === chat)?.title
 
 export default createRouter({
   history: createWebHistory(),
@@ -41,6 +50,8 @@ export default createRouter({
     { path: '/doc/:key(.*)', component: DocView, props: (r) => ({ docKey: r.params.key, title: r.query.title }) },
     { path: '/notes/:id', component: NoteView, props: true },
     { path: '/settings', component: Settings },
+    { path: '/s/:id', component: CustomSection, props: true },
+    { path: '/sections/new', component: NewSection },
   ],
 })
 

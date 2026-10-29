@@ -50,6 +50,15 @@ class Business(Base):
     position: Mapped[int] = mapped_column(default=0)
 
 
+class Section(Base):
+    """Раздел, созданный пользователем. tabs — вкладки из tasks, notes, mindsets, plan; ключ раздела — s<id>."""
+    __tablename__ = "sections"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    title: Mapped[str] = mapped_column(String(128))
+    tabs: Mapped[list] = mapped_column(JSON, default=list)
+    position: Mapped[int] = mapped_column(default=0)
+
+
 class Expense(Base):
     __tablename__ = "expenses"
     id: Mapped[int] = mapped_column(primary_key=True)

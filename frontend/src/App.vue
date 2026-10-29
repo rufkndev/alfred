@@ -1,6 +1,6 @@
 <script setup>
-import { onMounted } from 'vue'
-import { get, state } from './api'
+import { onMounted, watch } from 'vue'
+import { get, loadSections, state } from './api'
 import LockScreen from './components/LockScreen.vue'
 
 const LOCK_AFTER = 3 * 60 * 1000
@@ -11,6 +11,8 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) localStorage.setItem('hiddenAt', Date.now())
   else if (expired()) state.locked = true
 })
+
+watch(() => state.authed, (authed) => authed && loadSections())
 
 onMounted(async () => {
   Object.assign(state, await get('/auth/status'))

@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 
-export const state = reactive({ ready: false, authed: false, locked: true, faceid: false, tz: 'Europe/Moscow' })
+export const state = reactive({ ready: false, authed: false, locked: true, faceid: false, tz: 'Europe/Moscow', sections: [] })
 
 async function api(path, method = 'GET', body) {
   const r = await fetch('/api' + path, {
@@ -24,6 +24,9 @@ export const put = (p, b) => api(p, 'PUT', b)
 export const del = (p) => api(p, 'DELETE')
 
 export const q = (s) => encodeURIComponent(s)
+
+// Свои разделы, созданные в приложении
+export const loadSections = async () => (state.sections = await get('/sections'))
 
 // Даты в формате YYYY-MM-DD по часовому поясу приложения
 export function today() {

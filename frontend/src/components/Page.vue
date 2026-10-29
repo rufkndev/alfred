@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { SECTIONS } from '../router'
+import { allSections } from '../router'
 
 const props = defineProps({ title: String, back: String, chat: String, memory: String, memoryTitle: String })
 const menu = ref(false)
@@ -44,10 +44,11 @@ function goBack() {
         <div class="top-right" />
       </div>
       <nav>
-        <router-link v-for="s in SECTIONS" :key="s.path" :to="s.path" :class="{ active: route.path === s.path }" @click="menu = false">
+        <router-link v-for="s in allSections()" :key="s.path" :to="s.path" :class="{ active: route.path === s.path }" @click="menu = false">
           {{ s.title }}
         </router-link>
-        <router-link to="/settings" class="muted" @click="menu = false">Настройки</router-link>
+        <router-link to="/sections/new" class="menu-small" @click="menu = false">+ Новый раздел</router-link>
+        <router-link to="/settings" class="menu-small" @click="menu = false">Настройки</router-link>
       </nav>
     </div>
   </div>

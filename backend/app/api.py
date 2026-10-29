@@ -5,13 +5,14 @@ from sqlalchemy import delete, func, select, update
 
 from .auth import require_auth
 from .db import get_db, today
-from .models import Account, Balance, Business, Doc, Expense, Item, Note
+from .models import Account, Balance, Business, Doc, Expense, Item, Message, Note, Section
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_auth)])
 
 ITEM_FIELDS = ("text", "done", "archived", "date")
 NOTE_FIELDS = ("title", "body")
 EXPENSE_FIELDS = ("kind", "name", "amount", "every_n", "unit", "note")
+SECTION_TABS = ("tasks", "notes", "mindsets", "plan")
 
 
 def row(obj):
@@ -177,6 +178,53 @@ def patch_business(id: int, data: dict = Body(...), db=Depends(get_db)):
     biz = apply(get_or_404(db, Business, id), data, ("name", "archived"))
     db.commit()
     return row(biz)
+
+
+@router.delete("/businesses/{id}")
+def delete_business(id: int, db=Depends(get_db)):
+    """Удаляет бизнес вместе с его задачами, заметками и памятью."""
+    db.execute(delete(Item).filter_by(list=f"biz:{id}:tasks"))
+    db.execute(delete(Note).filter_by(list=f"biz:{id}"))
+    db.execute(delete(Doc).filter_by(key=f"memory:biz:{id}"))
+    db.execute(delete(Business).filter_by(id=id))
+    db.commit()
+    return {"ok": True}
+
+
+# --- свои разделы ---
+
+@router.get("/sections")
+def list_sections(db=Depends(get_db)):
+    return [row(s) for s in db.scalars(select(Section).order_by(Section.position, Section.id))]
+
+
+@router.post("/sections")
+def create_section(data: dict = Body(...), db=Depends(get_db)):
+    section = Section(title=data["title"], tabs=[t for t in SECTION_TABS if t in data.get("tabs", [])],
+                      position=next_pos(db, Section))
+    db.add(section)
+    db.commit()
+    return row(section)
+
+
+@router.patch("/sections/{id}")
+def patch_section(id: int, data: dict = Body(...), db=Depends(get_db)):
+    section = apply(get_or_404(db, Section, id), data, ("title",))
+    db.commit()
+    return row(section)
+
+
+@router.delete("/sections/{id}")
+def delete_section(id: int, db=Depends(get_db)):
+    """Удаляет раздел со всеми его задачами, заметками, установками, планом, памятью и чатом."""
+    key = f"s{id}"
+    db.execute(delete(Item).where(Item.list.in_([f"{key}_tasks", f"{key}_mindsets"])))
+    db.execute(delete(Note).filter_by(list=key))
+    db.execute(delete(Doc).where(Doc.key.in_([f"memory:{key}", f"plan:{key}"])))
+    db.execute(delete(Message).filter_by(chat=key))
+    db.execute(delete(Section).filter_by(id=id))
+    db.commit()
+    return {"ok": True}
 
 
 # --- expenses ---

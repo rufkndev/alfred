@@ -151,10 +151,28 @@ a {
   color: var(--text);
 }
 
-.menu nav a:last-child {
-  margin-top: 24px;
+.menu nav a.menu-small {
+  padding: 8px 0;
   font-size: 17px;
   font-weight: 400;
+}
+
+.menu nav a.menu-small:nth-last-child(2) {
+  margin-top: 24px;
+}
+
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+}
+
+.check-row input {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  accent-color: var(--text);
 }
 
 /* --- вкладки и дни --- */
@@ -308,6 +326,14 @@ a {
   margin-top: 32px;
   background: none;
   color: var(--muted);
+}
+
+.btn.subtle + .btn.subtle {
+  margin-top: 0;
+}
+
+.btn.subtle.danger {
+  color: var(--danger);
 }
 
 .form {

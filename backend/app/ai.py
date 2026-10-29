@@ -1,6 +1,7 @@
 import datetime as dt
 import json
 import os
+import threading
 from zoneinfo import ZoneInfo
 
 import openai
@@ -11,8 +12,8 @@ from sqlalchemy import delete, func, select
 from .api import (EXPENSE_FIELDS, ITEM_FIELDS, NOTE_FIELDS, accounts_view, add_item, apply, items_query,
                   next_pos, rollover, row)
 from .auth import require_auth
-from .db import TZ, get_db, now
-from .models import Account, Balance, Business, Doc, Expense, Item, Message, Note, Reminder
+from .db import TZ, Session, get_db, now
+from .models import Account, Balance, Business, Doc, Expense, Item, Message, Note, Reminder, Section
 
 client = openai.OpenAI(
     api_key=os.environ.get("OPENAI_API_KEY") or "not-set",
@@ -49,7 +50,8 @@ DATA_MAP = """## Данные приложения
 Списки (items, поле list): day_tasks — задачи на день (с date), day_blocks — блоки/дела дня без времени (с date),
 admission_tasks — задачи поступления, biz:<id>:tasks — задачи бизнеса, basketball_mindsets и cs2_mindsets —
 установки (archived=true — в архиве). У задач done = выполнено.
-Заметки (notes, поле list): admission, biz:<id>, basketball_materials, basketball_thoughts, cs2_materials, cs2_thoughts.
+Заметки (notes, поле list): general — заметки раздела «Общее», admission, biz:<id>, basketball_materials,
+basketball_thoughts, cs2_materials, cs2_thoughts.
 Документы (docs, по ключу): thoughts:YYYY-MM-DD — мысли за день, memory:<раздел> — твоя память раздела
 (разделы: general, economy, admission, business, basketball, cs2, gym, food), memory:biz:<id> — память бизнеса,
 plan:gym, plan:food — планы.
@@ -69,18 +71,48 @@ def doc_text(db, key):
     return d.text if d and d.text.strip() else "(пусто)"
 
 
+TAB_DATA = {"tasks": "задачи — список {k}_tasks", "notes": "заметки — список {k}",
+            "mindsets": "установки — список {k}_mindsets", "plan": "план — документ plan:{k}"}
+
+
+def custom_section(db, chat):
+    """Свой раздел по ключу чата s<id>, иначе None."""
+    return db.get(Section, int(chat[1:])) if chat[:1] == "s" and chat[1:].isdigit() else None
+
+
+def chat_info(db, chat):
+    if chat in CHATS:
+        return CHATS[chat]
+    section = custom_section(db, chat)
+    if not section:
+        raise HTTPException(404)
+    return section.title, (f"Ты помогаешь в разделе «{section.title}»: ведёшь его данные, отвечаешь на вопросы, "
+                           "предлагаешь идеи. Подробности о разделе и о пользователе — в твоей памяти.")
+
+
+def section_map(s):
+    k = f"s{s.id}"
+    data = [TAB_DATA[t].format(k=k) for t in s.tabs] + [f"память memory:{k}"]
+    return f"- «{s.title}» (раздел {k}): " + ", ".join(data)
+
+
 def system_prompt(db, chat):
-    title, role = CHATS[chat]
+    title, role = chat_info(db, chat)
+    sections = db.scalars(select(Section).order_by(Section.position, Section.id)).all()
     parts = [f"Ты Альфред — личный ИИ-ассистент. Сейчас {now():%Y-%m-%d %H:%M, %A} ({TZ}).",
              f"Раздел: {title}. {role}", DATA_MAP]
+    if sections:
+        parts.append("## Свои разделы пользователя\n" + "\n".join(section_map(s) for s in sections))
     if chat == "general":
-        parts += [f"## Память «{t}» (memory:{k})\n{doc_text(db, f'memory:{k}')}" for k, (t, _) in CHATS.items()]
+        memories = [(t, k) for k, (t, _) in CHATS.items()] + [(s.title, f"s{s.id}") for s in sections]
+        parts += [f"## Память «{t}» (memory:{k})\n{doc_text(db, f'memory:{k}')}" for t, k in memories]
     else:
         parts.append(f"## Твоя память (memory:{chat})\n{doc_text(db, f'memory:{chat}')}")
     if chat in ("general", "business"):
         for b in db.scalars(select(Business).filter_by(archived=False).order_by(Business.position)):
             parts.append(f"## Бизнес «{b.name}» (id={b.id}), память memory:biz:{b.id}\n{doc_text(db, f'memory:biz:{b.id}')}")
-    if chat in ("gym", "food"):
+    section = custom_section(db, chat)
+    if chat in ("gym", "food") or (section and "plan" in section.tabs):
         parts.append(f"## Текущий план (plan:{chat})\n{doc_text(db, f'plan:{chat}')}")
     return "\n\n".join(parts)
 
@@ -303,21 +335,22 @@ def context(db, chat):
 
 router = APIRouter(prefix="/api/chat", dependencies=[Depends(require_auth)])
 
-
-def check_chat(chat):
-    if chat not in CHATS:
-        raise HTTPException(404)
+# Ответ ИИ считается в фоновом потоке, поэтому не обрывается, если закрыть приложение.
+# running — чаты, где ответ ещё готовится; errors — ошибка последнего ответа (отдаётся один раз).
+running: set[str] = set()
+errors: dict[str, str] = {}
+lock = threading.Lock()
 
 
 @router.get("/{chat}")
 def history(chat: str, db=Depends(get_db)):
-    check_chat(chat)
-    return [row(m) for m in dialog(db, chat)]
+    chat_info(db, chat)
+    return {"messages": [row(m) for m in dialog(db, chat)], "busy": chat in running, "error": errors.pop(chat, None)}
 
 
 @router.post("/{chat}/reset")
 def reset(chat: str, db=Depends(get_db)):
-    check_chat(chat)
+    chat_info(db, chat)
     db.add(Message(chat=chat, role="reset"))
     db.commit()
     return {"ok": True}
@@ -325,19 +358,37 @@ def reset(chat: str, db=Depends(get_db)):
 
 @router.post("/{chat}")
 def send(chat: str, data: dict = Body(...), db=Depends(get_db)):
-    check_chat(chat)
-    user = Message(chat=chat, role="user", content=data["text"])
-    db.add(user)
-    db.commit()
-    new = [user]
+    chat_info(db, chat)
+    with lock:
+        if chat in running:
+            raise HTTPException(409, "Альфред ещё отвечает на прошлое сообщение")
+        running.add(chat)
+    try:
+        db.add(Message(chat=chat, role="user", content=data["text"]))
+        db.commit()
+    except Exception:
+        running.discard(chat)
+        raise
+    threading.Thread(target=respond, args=(chat,), daemon=True).start()
+    return {"ok": True}
+
+
+def respond(chat):
+    try:
+        with Session() as db:
+            answer(db, chat)
+    except Exception as e:
+        errors[chat] = f"Ошибка: {e}"
+    finally:
+        running.discard(chat)
+
+
+def answer(db, chat):
     # первый запрос — вся история; дальше результаты инструментов цепляются через previous_response_id,
     # чтобы модель сохраняла рассуждения между вызовами
     request = {"input": context(db, chat)}
     for _ in range(10):
-        try:
-            r = client.responses.create(model=MODEL, tools=TOOL_SCHEMAS, instructions=system_prompt(db, chat), **request)
-        except Exception as e:
-            raise HTTPException(502, f"OpenAI: {e}")
+        r = client.responses.create(model=MODEL, tools=TOOL_SCHEMAS, instructions=system_prompt(db, chat), **request)
         calls = [{"id": o.call_id, "type": "function", "function": {"name": o.name, "arguments": o.arguments}}
                  for o in r.output if o.type == "function_call"]
         batch = [Message(chat=chat, role="assistant", content=r.output_text or "", meta={"tool_calls": calls} if calls else None)]
@@ -346,8 +397,6 @@ def send(chat: str, data: dict = Body(...), db=Depends(get_db)):
             batch.append(Message(chat=chat, role="tool", content=result, meta={"tool_call_id": c["id"], "label": label}))
         db.add_all(batch)
         db.commit()
-        new += batch
         if not calls:
             break
         request = {"previous_response_id": r.id, "input": [i for m in batch[1:] for i in to_input(m)]}
-    return [row(m) for m in new]
