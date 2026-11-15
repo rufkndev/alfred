@@ -3,7 +3,7 @@ import os
 from decimal import Decimal
 from pathlib import Path
 
-from sqlalchemy import JSON, Date, DateTime, ForeignKey, LargeBinary, Numeric, String, Text, func, select
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, Numeric, String, Text, func, select
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -122,13 +122,6 @@ class AuthSession(Base):
     __tablename__ = "sessions"
     token: Mapped[str] = mapped_column(String(64), primary_key=True)
     created_at: Mapped[dt.datetime] = Created()
-
-
-class Credential(Base):
-    __tablename__ = "webauthn_creds"
-    id: Mapped[str] = mapped_column(String(512), primary_key=True)  # base64url
-    public_key: Mapped[bytes] = mapped_column(LargeBinary)
-    sign_count: Mapped[int] = mapped_column(default=0)
 
 
 SEED_DIR = Path(os.environ.get("SEED_DIR", "/srv/seed"))

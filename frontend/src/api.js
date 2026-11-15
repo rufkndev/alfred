@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 
-export const state = reactive({ ready: false, authed: false, locked: true, faceid: false, tz: 'Europe/Moscow', sections: [] })
+export const state = reactive({ ready: false, authed: false, locked: true, tz: 'Europe/Moscow', sections: [] })
 
 async function api(path, method = 'GET', body) {
   const r = await fetch('/api' + path, {

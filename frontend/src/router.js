@@ -5,7 +5,6 @@ import Economy from './views/Economy.vue'
 import Admission from './views/Admission.vue'
 import Business from './views/Business.vue'
 import BusinessItem from './views/BusinessItem.vue'
-import Skill from './views/Skill.vue'
 import Plan from './views/Plan.vue'
 import ChatView from './views/ChatView.vue'
 import DocView from './views/DocView.vue'
@@ -21,8 +20,6 @@ export const SECTIONS = [
   { path: '/economy', title: 'Экономика', chat: 'economy' },
   { path: '/admission', title: 'Поступление', chat: 'admission' },
   { path: '/business', title: 'Бизнес', chat: 'business' },
-  { path: '/basketball', title: 'Баскетбол', chat: 'basketball' },
-  { path: '/cs2', title: 'CS2', chat: 'cs2' },
   { path: '/gym', title: 'Зал', chat: 'gym' },
   { path: '/food', title: 'Питание', chat: 'food' },
 ]
@@ -43,8 +40,6 @@ export default createRouter({
     { path: '/admission', component: Admission },
     { path: '/business', component: Business },
     { path: '/business/:id', component: BusinessItem, props: true },
-    { path: '/basketball', component: Skill, props: { section: 'basketball' } },
-    { path: '/cs2', component: Skill, props: { section: 'cs2' } },
     { path: '/gym', component: Plan, props: { section: 'gym' } },
     { path: '/food', component: Plan, props: { section: 'food' } },
     { path: '/chat/:chat', component: ChatView, props: true },

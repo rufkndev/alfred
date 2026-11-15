@@ -1,6 +1,5 @@
 <script setup>
 import { ref } from 'vue'
-import { startRegistration } from '@simplewebauthn/browser'
 import { get, post, state } from '../api'
 import Page from '../components/Page.vue'
 
@@ -15,14 +14,6 @@ async function run(fn) {
     message.value = e.message
   }
 }
-
-const enableFaceId = () =>
-  run(async () => {
-    const optionsJSON = await post('/auth/webauthn/register/options')
-    await post('/auth/webauthn/register/verify', await startRegistration({ optionsJSON }))
-    state.faceid = true
-    message.value = 'Face ID включён'
-  })
 
 const enablePush = () =>
   run(async () => {
@@ -53,9 +44,6 @@ const logout = () =>
 <template>
   <Page title="Настройки" back="/">
     <div class="list">
-      <button class="nav-row" @click="enableFaceId">
-        Face ID <span class="muted">{{ state.faceid ? 'включён · добавить ещё' : 'включить' }}</span>
-      </button>
       <button class="nav-row" @click="enablePush">
         Уведомления <span class="muted">{{ pushOn ? 'включены · обновить' : 'включить' }}</span>
       </button>
